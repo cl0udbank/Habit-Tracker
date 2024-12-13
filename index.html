@@ -9,12 +9,9 @@
     <!-- React and React DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Dependencies for Recharts -->
-    <script src="https://unpkg.com/d3-array@3.2.0/dist/d3-array.min.js"></script>
-    <script src="https://unpkg.com/d3-scale@4.0.2/dist/d3-scale.min.js"></script>
-    <script src="https://unpkg.com/d3-shape@3.1.0/dist/d3-shape.min.js"></script>
-    <!-- Recharts -->
-    <script src="https://unpkg.com/recharts@2.1.12/umd/Recharts.min.js"></script>
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
     <!-- Lodash -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
 </head>
@@ -22,22 +19,53 @@
     <div id="root"></div>
 
     <script type="text/javascript">
+        // TODO: Replace with your Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "your-project-id.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project-id.appspot.com",
+            messagingSenderId: "your-messaging-sender-id",
+            appId: "your-app-id",
+            databaseURL: "https://your-project-id-default-rtdb.firebaseio.com"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
         const App = () => {
-            const [entries, setEntries] = React.useState(() => {
-                const savedEntries = localStorage.getItem('habitEntries');
-                return savedEntries ? JSON.parse(savedEntries) : [];
-            });
+            const [entries, setEntries] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
 
+            // Load entries from Firebase on component mount
             React.useEffect(() => {
-                localStorage.setItem('habitEntries', JSON.stringify(entries));
-            }, [entries]);
+                const entriesRef = database.ref('entries');
+                
+                entriesRef.on('value', (snapshot) => {
+                    const data = snapshot.val();
+                    if (data) {
+                        const entriesArray = Object.values(data);
+                        setEntries(entriesArray);
+                    } else {
+                        setEntries([]);
+                    }
+                    setLoading(false);
+                });
 
+                // Cleanup subscription
+                return () => entriesRef.off();
+            }, []);
+
+            // Handler for button press
             const handlePress = () => {
                 const newEntry = {
                     timestamp: new Date().toISOString(),
                     date: new Date().toLocaleDateString()
                 };
-                setEntries([...entries, newEntry]);
+
+                // Push new entry to Firebase
+                database.ref('entries').push(newEntry);
             };
 
             const handleExport = () => {
@@ -71,17 +99,16 @@
                 document.body.removeChild(link);
             };
 
-            const chartData = _.chain(entries)
-                .groupBy('date')
-                .map((group, date) => ({
-                    date,
-                    count: group.length
-                }))
-                .orderBy('date')
-                .value();
-
             const todayDate = new Date().toLocaleDateString();
             const todayCount = entries.filter(entry => entry.date === todayDate).length;
+
+            if (loading) {
+                return React.createElement('div', {
+                    className: "flex items-center justify-center min-h-screen"
+                }, React.createElement('p', {
+                    className: "text-white text-xl"
+                }, "Loading..."));
+            }
 
             return React.createElement('div', { 
                 className: "p-4 max-w-4xl mx-auto space-y-6 bg-black min-h-screen text-white" 
