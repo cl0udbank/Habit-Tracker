@@ -9,18 +9,179 @@
     <!-- React and React DOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <!-- Babel for JSX -->
-    <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
+    <!-- Dependencies for Recharts -->
+    <script src="https://unpkg.com/d3-array@3.2.0/dist/d3-array.min.js"></script>
+    <script src="https://unpkg.com/d3-scale@4.0.2/dist/d3-scale.min.js"></script>
+    <script src="https://unpkg.com/d3-shape@3.1.0/dist/d3-shape.min.js"></script>
     <!-- Recharts -->
-    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/recharts@2.1.12/umd/Recharts.min.js"></script>
     <!-- Lodash -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
 </head>
 <body class="bg-black">
     <div id="root"></div>
-    <script type="text/babel" src="App.js"></script>
-    <script type="text/babel">
-        ReactDOM.render(<App />, document.getElementById('root'));
+
+    <script type="text/javascript">
+        const App = () => {
+            const [entries, setEntries] = React.useState(() => {
+                const savedEntries = localStorage.getItem('habitEntries');
+                return savedEntries ? JSON.parse(savedEntries) : [];
+            });
+
+            React.useEffect(() => {
+                localStorage.setItem('habitEntries', JSON.stringify(entries));
+            }, [entries]);
+
+            const handlePress = () => {
+                const newEntry = {
+                    timestamp: new Date().toISOString(),
+                    date: new Date().toLocaleDateString()
+                };
+                setEntries([...entries, newEntry]);
+            };
+
+            const handleExport = () => {
+                const escapeCsvField = (field) => {
+                    const stringField = String(field);
+                    if (stringField.includes(',') || stringField.includes('"') || stringField.includes('\n')) {
+                        return `"${stringField.replace(/"/g, '""')}"`;
+                    }
+                    return stringField;
+                };
+
+                const csvContent = [
+                    ['Date', 'Time', 'Timestamp'],
+                    ...entries.map(entry => [
+                        escapeCsvField(new Date(entry.timestamp).toLocaleDateString()),
+                        escapeCsvField(new Date(entry.timestamp).toLocaleTimeString()),
+                        escapeCsvField(entry.timestamp)
+                    ])
+                ]
+                    .map(row => row.join(','))
+                    .join('\n');
+
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', `habit-tracking-${new Date().toISOString().split('T')[0]}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            const chartData = _.chain(entries)
+                .groupBy('date')
+                .map((group, date) => ({
+                    date,
+                    count: group.length
+                }))
+                .orderBy('date')
+                .value();
+
+            const todayDate = new Date().toLocaleDateString();
+            const todayCount = entries.filter(entry => entry.date === todayDate).length;
+
+            return React.createElement('div', { 
+                className: "p-4 max-w-4xl mx-auto space-y-6 bg-black min-h-screen text-white" 
+            }, [
+                // Main tracker card
+                React.createElement('div', {
+                    key: 'main-card',
+                    className: "bg-gray-900 rounded-lg shadow-xl border border-gray-800"
+                }, [
+                    React.createElement('div', {
+                        key: 'header',
+                        className: "flex flex-row items-center justify-between p-4 border-b border-gray-800"
+                    }, [
+                        React.createElement('h2', {
+                            className: "text-xl font-bold text-white"
+                        }, "Habit Tracker"),
+                        React.createElement('button', {
+                            onClick: handleExport,
+                            className: "flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-white px-4 py-2 rounded-md",
+                            disabled: entries.length === 0
+                        }, "Export Data")
+                    ]),
+                    React.createElement('div', {
+                        key: 'content',
+                        className: "p-6 space-y-4"
+                    }, [
+                        React.createElement('div', {
+                            className: "text-center py-8"
+                        }, [
+                            React.createElement('button', {
+                                onClick: handlePress,
+                                className: "w-48 h-48 rounded-full text-2xl bg-white hover:bg-gray-100 text-black font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                            }, "Track"),
+                            React.createElement('p', {
+                                className: "mt-6 text-xl text-gray-300"
+                            }, `Today's Count: ${todayCount}`)
+                        ])
+                    ])
+                ]),
+
+                // History table
+                React.createElement('div', {
+                    key: 'history-card',
+                    className: "bg-gray-900 rounded-lg shadow-xl border border-gray-800"
+                }, [
+                    React.createElement('div', {
+                        key: 'header',
+                        className: "p-4 border-b border-gray-800"
+                    }, [
+                        React.createElement('h2', {
+                            className: "text-xl font-bold text-white"
+                        }, "History")
+                    ]),
+                    React.createElement('div', {
+                        key: 'content',
+                        className: "p-4"
+                    }, [
+                        React.createElement('div', {
+                            className: "overflow-x-auto"
+                        }, [
+                            React.createElement('table', {
+                                className: "w-full"
+                            }, [
+                                React.createElement('thead', {}, [
+                                    React.createElement('tr', {
+                                        className: "border-b border-gray-800"
+                                    }, [
+                                        React.createElement('th', {
+                                            className: "py-2 px-4 text-left font-medium text-gray-300"
+                                        }, "Date"),
+                                        React.createElement('th', {
+                                            className: "py-2 px-4 text-left font-medium text-gray-300"
+                                        }, "Time")
+                                    ])
+                                ]),
+                                React.createElement('tbody', {}, 
+                                    entries.slice().reverse().map((entry, index) => 
+                                        React.createElement('tr', {
+                                            key: index,
+                                            className: "border-b border-gray-800"
+                                        }, [
+                                            React.createElement('td', {
+                                                className: "py-2 px-4 text-gray-300"
+                                            }, new Date(entry.timestamp).toLocaleDateString()),
+                                            React.createElement('td', {
+                                                className: "py-2 px-4 text-gray-300"
+                                            }, new Date(entry.timestamp).toLocaleTimeString())
+                                        ])
+                                    )
+                                )
+                            ])
+                        ])
+                    ])
+                ])
+            ]);
+        };
+
+        // Render the App
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(React.createElement(App));
     </script>
 </body>
 </html>
